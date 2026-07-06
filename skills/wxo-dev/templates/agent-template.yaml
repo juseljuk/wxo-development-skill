@@ -1,0 +1,60 @@
+# Agent Template
+# Copy this template and customize for your agent
+
+spec_version: v1
+kind: native
+name: my_agent_name                    # REQUIRED: snake_case, no spaces
+llm: groq/openai/gpt-oss-120b         # REQUIRED: LLM model
+style: default                         # Optional: default, react, planner
+hide_reasoning: false                  # Optional: Show/hide reasoning
+
+description: |                         # REQUIRED: Clear description
+  Brief description of what this agent does.
+  Include key capabilities and use cases.
+
+instructions: |                        # REQUIRED: General behavior
+  You are a [role/persona].
+  
+  Your responsibilities:
+  - [Responsibility 1]
+  - [Responsibility 2]
+  - [Responsibility 3]
+  
+  Always:
+  - [Guideline 1]
+  - [Guideline 2]
+  
+  Never:
+  - [Restriction 1]
+  - [Restriction 2]
+
+guidelines:                            # Optional: Rule-based behavior
+  - condition: "When [specific situation occurs]"
+    action: "Then [specific action to take]"
+    tool: "tool_name"                 # Optional: Tool to invoke
+  
+  - condition: "When [another situation]"
+    action: "Then [another action]"
+    # Note: For collaborator handoff, describe in action, don't use tool field
+
+tools:                                 # Optional: List of tools
+  - tool_name                          # Python tools
+  - toolkit:tool_name                  # MCP toolkit tools
+
+collaborators:                         # Optional: Other agents
+  - other_agent_name
+
+knowledge_base:                        # Optional: Knowledge bases
+  - kb_name
+
+# Only include plugins section if you have implemented and imported plugins
+# plugins:
+#   agent_pre_invoke:
+#     - plugin_name: content_safety_guardrail
+#   agent_post_invoke:
+#     - plugin_name: pii_filter_guardrail
+
+restrictions: editable                 # Optional: editable, non_editable
+hidden: false                          # Optional: Hide from UI
+
+# Made with Bob

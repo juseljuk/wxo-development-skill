@@ -1,0 +1,66 @@
+# Knowledge Base Template
+# Copy this template and customize for your knowledge base
+
+spec_version: v1
+kind: knowledge_base
+name: my_kb_name                       # REQUIRED: Unique identifier
+description: |                         # REQUIRED: Clear description
+  Description of what information this knowledge base contains.
+  Include the scope, purpose, and types of questions it can answer.
+
+documents:                             # REQUIRED: List of document files
+  - path: document1.pdf                # Relative path to this YAML file
+  - path: docs/document2.txt           # Can use subdirectories
+  - path: ../shared/document3.docx     # Can reference parent directories
+
+# Supported formats:
+# - PDF (.pdf) - up to 25 MB
+# - Word (.docx) - up to 25 MB
+# - PowerPoint (.pptx) - up to 25 MB
+# - Excel (.xlsx) - up to 1 MB
+# - Text (.txt) - up to 5 MB
+# - CSV (.csv) - up to 5 MB
+# - HTML (.html) - up to 5 MB
+
+vector_index:                          # Optional: Vector index settings
+  embeddings_model_name: ibm/slate-125m-english-rtrvr-v2
+  chunk_size: 400                      # Default: 400 (increase for more context)
+  chunk_overlap: 50                    # Default: 50 (increase for better continuity)
+  extraction_strategy: standard        # Default: standard
+
+conversational_search_tool:            # Optional: Search tool configuration
+  generation:
+    prompt_instruction: |
+      Instructions for how to answer questions based on this knowledge base.
+      
+      Guidelines:
+      - Provide accurate information from the documents
+      - Cite specific sections when possible
+      - If information is not in the KB, clearly state that
+      - Be concise but comprehensive
+    
+    max_docs_passed_to_llm: 10         # Number of relevant docs to use (1-20)
+    generated_response_length: Moderate # Short, Moderate, or Long
+    idk_message: "I don't have information about that in the knowledge base. Please ask about topics covered in the documentation."
+  
+  confidence_thresholds:
+    retrieval_confidence_threshold: Low  # Low, Medium, or High
+    response_confidence_threshold: Low   # Low, Medium, or High
+  
+  query_rewrite:
+    enabled: true                      # Enable query rewriting for better results
+  
+  citations:
+    citations_shown: -1                # -1 for all, or specific number
+
+# Import instructions:
+# orchestrate knowledge-bases import -f knowledge_bases/my_kb_name.yaml
+#
+# Check status:
+# orchestrate knowledge-bases get -n my_kb_name
+#
+# Use in agent:
+# knowledge_base:
+#   - my_kb_name
+
+# Made with Bob

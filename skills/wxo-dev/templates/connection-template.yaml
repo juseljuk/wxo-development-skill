@@ -1,0 +1,43 @@
+# Connection Template
+# Copy this template and customize for your external API connection
+
+name: my-connection-name               # REQUIRED: Unique identifier
+type: http                             # REQUIRED: Connection type
+auth:                                  # REQUIRED: Authentication config
+  type: bearer_token                   # Auth type: bearer_token, api_key, oauth2
+  token: ${API_TOKEN}                  # From environment variable
+
+# Alternative auth types:
+
+# API Key Authentication:
+# auth:
+#   type: api_key
+#   api_key: ${API_KEY}
+#   header_name: X-API-Key
+
+# OAuth2 Authentication:
+# auth:
+#   type: oauth2
+#   client_id: ${CLIENT_ID}
+#   client_secret: ${CLIENT_SECRET}
+#   token_url: https://auth.example.com/token
+#   scope: read write
+
+# Basic Authentication:
+# auth:
+#   type: basic
+#   username: ${USERNAME}
+#   password: ${PASSWORD}
+
+# Import instructions:
+# orchestrate connections import -f connections/my-connection.yaml
+#
+# Or use CLI (recommended for API keys):
+# orchestrate connections add --app-id my-connection --env draft
+# orchestrate connections configure --app-id my-connection --env draft --type team --kind key_value
+# orchestrate connections set-credentials --app-id my-connection --env draft --entries "api_key=$API_KEY"
+#
+# For external models:
+# orchestrate models add --name provider/model-name --app-id my-connection
+
+# Made with Bob
