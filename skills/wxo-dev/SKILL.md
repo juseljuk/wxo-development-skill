@@ -989,19 +989,114 @@ settings:
 
 ### Deployment Process
 
-```bash
-# 1. Import all artifacts
-./import-all.sh
+**CRITICAL**: Import order matters! Dependencies must be imported before the agents that reference them.
 
-# 2. Verify deployment
+**Correct Import Order:**
+
+1. **Connections** (if using external APIs or models)
+2. **Models** (if using external LLMs)
+3. **Guardrail Plugins** (if agents use pre/post-invoke plugins)
+4. **MCP Toolkits** (if using MCP servers)
+5. **Python Tools** (individual tools)
+6. **Workflows** (agentic workflows/flows)
+7. **Knowledge Bases** (document collections)
+8. **Collaborator Agents** (agents that will be called by other agents)
+9. **Orchestrator Agents** (agents that reference collaborators)
+
+**Why Order Matters:**
+- Agents cannot be imported if they reference tools, knowledge bases, collaborators, or guardrails that don't exist yet
+- Guardrail plugins must exist before agents that reference them in their `plugins` section
+- Tools in workflows must exist before the workflow is imported
+- Collaborator agents must exist before orchestrator agents that call them
+- Connections must exist before models that use them
+
+**Example Import Script:**
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 Importing watsonx Orchestrate artifacts in correct order..."
+
+# 1. Connections (for external APIs/models)
+echo "🔗 Importing connections..."
+for file in connections/*.yaml; do
+    [ -f "$file" ] && orchestrate connections import -f "$file"
+done
+
+# 2. Models (external LLMs)
+echo "🤖 Importing models..."
+# orchestrate models add --name openai/gpt-4 --app-id openai
+
+# 3. Guardrail Plugins (MUST be before agents that use them)
+echo "🛡️ Importing guardrail plugins..."
+for file in plugins/*.py; do
+    [ -f "$file" ] && orchestrate tools import -k python -f "$file"
+done
+
+# 4. MCP Toolkits
+echo "🧰 Importing MCP toolkits..."
+for file in toolkits/*.yaml; do
+    [ -f "$file" ] && orchestrate toolkits import -f "$file"
+done
+
+# 5. Python Tools
+echo "🔧 Importing Python tools..."
+for file in tools/*.py; do
+    [ -f "$file" ] && [[ ! "$file" =~ _workflow\.py$ ]] && \
+        orchestrate tools import -k python -f "$file"
+done
+
+# 6. Workflows (agentic workflows)
+echo "🔄 Importing workflows..."
+for file in tools/*_workflow.py; do
+    [ -f "$file" ] && orchestrate tools import -k flow -f "$file"
+done
+
+# 7. Knowledge Bases
+echo "📚 Importing knowledge bases..."
+for file in knowledge_bases/*.yaml; do
+    [ -f "$file" ] && orchestrate knowledge-bases import -f "$file"
+done
+
+# 8. Collaborator Agents (imported before orchestrators)
+echo "👥 Importing collaborator agents..."
+# Import specific collaborator agents first
+[ -f "agents/escalation-agent.yaml" ] && orchestrate agents import -f "agents/escalation-agent.yaml"
+[ -f "agents/specialist-agent.yaml" ] && orchestrate agents import -f "agents/specialist-agent.yaml"
+
+# 9. Orchestrator Agents (reference collaborators)
+echo "🎯 Importing orchestrator agents..."
+for file in agents/*.yaml; do
+    # Skip already imported collaborators
+    if [ -f "$file" ] && [[ ! "$file" =~ (escalation|specialist)-agent\.yaml$ ]]; then
+        orchestrate agents import -f "$file"
+    fi
+done
+
+echo "✅ Import complete!"
+echo ""
+echo "Verify with:"
+echo "  orchestrate agents list"
+echo "  orchestrate tools list"
+echo "  orchestrate knowledge-bases list"
+```
+
+**Quick Verification:**
+```bash
+# Verify all artifacts imported successfully
 orchestrate agents list
 orchestrate tools list
+orchestrate toolkits list
 orchestrate knowledge-bases list
+orchestrate connections list
+```
 
-# 3. Deploy agent (not in Developer Edition)
+**Deployment (SaaS/On-Premises only):**
+```bash
+# Deploy agent (not available in Developer Edition)
 orchestrate agents deploy --name my-agent
 
-# 4. Deploy channels
+# Deploy channels
 orchestrate channels deploy channel-name
 ```
 
