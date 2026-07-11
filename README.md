@@ -33,6 +33,7 @@ A comprehensive skill specification that helps coding agents (like Claude, GPT-4
 This skill provides comprehensive guidance for developing watsonx Orchestrate solutions, covering:
 
 - **Agents** - Native agents with guidelines, multi-agent collaboration
+- **LangGraph Agents** - Stateful, multi-actor applications with LangGraph framework
 - **Tools** - Python tools with proper type hints and error handling
 - **Workflows** - Deterministic agentic workflows (60% faster than agents)
 - **Knowledge Bases** - Document-based RAG with vector search
@@ -98,9 +99,10 @@ watsonx Orchestrate development requires following specific patterns, naming con
 
 ```
 skills/wxo-dev/
-├── SKILL.md                          # 🎯 Core skill file (1,172 lines)
+├── SKILL.md                          # 🎯 Core skill file (1,400+ lines)
 │   ├── Quick Start & Project Structure
 │   ├── Agent Development
+│   ├── LangGraph Agent Integration
 │   ├── Tools & Workflows
 │   ├── Knowledge Bases & MCP Integration
 │   ├── Security & Connections
@@ -109,10 +111,11 @@ skills/wxo-dev/
 │   ├── Documentation & MCP Servers
 │   └── Troubleshooting & Optimization
 │
-├── examples.md                       # 📚 Complete reference implementations (720 lines)
+├── examples.md                       # 📚 Complete reference implementations (950+ lines)
 │   ├── Complete Agent Examples
 │   ├── Tool Examples
 │   ├── Workflow Examples
+│   ├── LangGraph Agent Examples (4 complete examples)
 │   ├── Knowledge Base Examples
 │   ├── MCP Integration Examples
 │   ├── Multi-Agent Collaboration Examples
@@ -123,7 +126,7 @@ skills/wxo-dev/
 │
 ├── references/                       # 📖 Deep-dive documentation
 │   ├── project-structure.md          # Detailed project organization
-│   ├── yaml-schemas.md               # Complete YAML schema reference
+│   ├── yaml-schemas.md               # Complete YAML schema reference (includes LangGraph)
 │   ├── cli-commands.md               # Comprehensive CLI documentation
 │   └── troubleshooting.md            # Exhaustive error catalog
 │
@@ -133,7 +136,10 @@ skills/wxo-dev/
 │   └── create-kb.sh                  # Initialize knowledge bases
 │
 └── templates/                        # 📝 Copy-paste starting points
-    ├── agent-template.yaml           # Agent YAML template
+    ├── agent-template.yaml           # Native agent YAML template
+    ├── langgraph-agent-template.yaml # LangGraph agent YAML template
+    ├── langgraph-agent-template.py   # LangGraph agent Python template
+    ├── langgraph-requirements.txt    # LangGraph dependencies template
     ├── tool-template.py              # Python tool template
     ├── workflow-template.py          # Agentic workflow template
     ├── kb-template.yaml              # Knowledge base template
@@ -525,30 +531,35 @@ Reference your extensions:
 
 ## 📊 Content Organization
 
-### SKILL.md (1,172 lines) - Core Guidance
+### SKILL.md (1,400+ lines) - Core Guidance
 
-Condensed, actionable guidance organized into 9 sections:
+Condensed, actionable guidance organized into 10 sections:
 
 | Section | Lines | Focus |
 |---------|-------|-------|
 | 1. Quick Start & Project Structure | 150 | Setup, directories, commands |
 | 2. Agent Development | 150 | Naming, YAML, guidelines |
-| 3. Tools & Workflows | 200 | @tool, @flow, type hints |
-| 4. Knowledge Bases & MCP | 150 | KB format, MCP integration |
-| 5. Security & Connections | 100 | Guardrails, connections |
-| 6. Testing & Evaluation | 100 | Testing, eval config |
-| 7. Deployment & Channels | 80 | Channels, deployment |
-| 8. Documentation & MCP Servers | 90 | watsonx-orchestrate-adk-docs MCP server |
-| 9. Troubleshooting & Optimization | 70 | Errors, performance |
+| 3. LangGraph Agent Integration | 300+ | StateGraph, checkpointers, factory functions |
+| 4. Tools & Workflows | 200 | @tool, @flow, type hints |
+| 5. Knowledge Bases & MCP | 150 | KB format, MCP integration |
+| 6. Security & Connections | 100 | Guardrails, connections |
+| 7. Testing & Evaluation | 100 | Testing, eval config |
+| 8. Deployment & Channels | 80 | Channels, deployment |
+| 9. Documentation & MCP Servers | 90 | watsonx-orchestrate-adk-docs MCP server |
+| 10. Troubleshooting & Optimization | 70 | Errors, performance |
 
-### examples.md (720 lines) - Complete Implementations
+### examples.md (950+ lines) - Complete Implementations
 
-10+ working examples covering all major patterns:
+14+ working examples covering all major patterns:
 
 - ✅ Customer support agent with guidelines
 - ✅ Sales agent with knowledge base
 - ✅ Order status and refund processing tools
 - ✅ Loan approval workflow with branching
+- ✅ **Simple LangGraph research agent**
+- ✅ **LangGraph customer support with PostgreSQL persistence**
+- ✅ **Advanced LangGraph agent with external LLM**
+- ✅ **LangGraph agents as collaborators**
 - ✅ Product catalog knowledge base
 - ✅ MCP server integration
 - ✅ Multi-agent collaboration
@@ -561,7 +572,7 @@ Condensed, actionable guidance organized into 9 sections:
 Exhaustive details for specific topics:
 
 - **project-structure.md** - Directory organization, naming conventions
-- **yaml-schemas.md** - Complete YAML schema documentation
+- **yaml-schemas.md** - Complete YAML schema documentation (includes LangGraph agent schema)
 - **cli-commands.md** - All CLI commands with flags
 - **troubleshooting.md** - Error catalog, debugging procedures
 
@@ -577,7 +588,10 @@ Ready-to-use bash scripts:
 
 Copy-paste templates for all artifact types:
 
-- **agent-template.yaml** - Agent YAML structure
+- **agent-template.yaml** - Native agent YAML structure
+- **langgraph-agent-template.yaml** - LangGraph agent YAML structure
+- **langgraph-agent-template.py** - LangGraph agent Python implementation
+- **langgraph-requirements.txt** - LangGraph dependencies
 - **tool-template.py** - Python tool with type hints
 - **workflow-template.py** - Agentic workflow structure
 - **kb-template.yaml** - Knowledge base configuration
@@ -605,11 +619,19 @@ The skill was validated against Agent Skills format requirements and tested with
 ✅ **Error Prevention** - Common mistakes documented  
 ✅ **Usability** - Tested with coding agents  
 
-#### Areas for Improvement (0.5 deduction)
+#### Recent Enhancements
 
-- Could add more workflow examples (currently 1)
+- ✅ Added comprehensive LangGraph agent integration (300+ lines)
+- ✅ Added 4 complete LangGraph agent examples
+- ✅ Added LangGraph YAML schema documentation
+- ✅ Created 3 LangGraph templates (YAML, Python, requirements)
+- ✅ Updated import-all.sh for LangGraph agent deployment
+
+#### Areas for Future Improvement
+
 - Could expand red-teaming documentation
 - Could include more channel configuration examples
+- Could add more advanced LangGraph patterns (parallel execution, human-in-the-loop)
 
 #### Validation Criteria Met
 
@@ -630,13 +652,13 @@ The skill was validated against Agent Skills format requirements and tested with
 
 ### Core Files
 
-#### `SKILL.md` (1,172 lines)
-The main skill file containing condensed, actionable guidance. Organized into 9 sections covering the entire watsonx Orchestrate development lifecycle. Includes critical rules, common mistakes, and quick reference patterns. Features a dedicated section on using the watsonx-orchestrate-adk-docs MCP server for documentation lookup.
+#### `SKILL.md` (1,400+ lines)
+The main skill file containing condensed, actionable guidance. Organized into 10 sections covering the entire watsonx Orchestrate development lifecycle, including a comprehensive LangGraph agent integration section. Includes critical rules, common mistakes, and quick reference patterns. Features a dedicated section on using the watsonx-orchestrate-adk-docs MCP server for documentation lookup.
 
 **When to use**: Primary reference for all watsonx Orchestrate development tasks.
 
-#### `examples.md` (720 lines)
-Complete, working reference implementations demonstrating best practices. Includes 10+ examples covering agents, tools, workflows, knowledge bases, MCP integration, guardrails, testing, and deployment.
+#### `examples.md` (950+ lines)
+Complete, working reference implementations demonstrating best practices. Includes 14+ examples covering native agents, LangGraph agents, tools, workflows, knowledge bases, MCP integration, guardrails, testing, and deployment.
 
 **When to use**: When you need complete, copy-paste ready code examples.
 
@@ -648,7 +670,7 @@ Detailed explanations of directory organization, file naming conventions, and pr
 **When to use**: When setting up a new project or organizing existing code.
 
 #### `references/yaml-schemas.md`
-Complete YAML schema documentation for all artifact types (agents, tools, knowledge bases, connections, channels). Includes all optional parameters and advanced configurations.
+Complete YAML schema documentation for all artifact types (native agents, LangGraph agents, tools, knowledge bases, connections, channels). Includes all optional parameters, advanced configurations, and LangGraph-specific requirements.
 
 **When to use**: When you need exhaustive YAML schema details.
 
@@ -665,7 +687,7 @@ Exhaustive error catalog with solutions, debugging procedures, log analysis tech
 ### Automation Scripts
 
 #### `scripts/import-all.sh`
-Comprehensive deployment script that imports all artifacts (agents, tools, workflows, knowledge bases, toolkits) in the correct order.
+Comprehensive deployment script that imports all artifacts (LangGraph agents, native agents, tools, workflows, knowledge bases, toolkits) in the correct dependency order.
 
 **When to use**: For deploying complete projects or updating multiple artifacts.
 
@@ -682,9 +704,24 @@ Template for initializing knowledge bases with documents and vector indexing con
 ### Templates
 
 #### `templates/agent-template.yaml`
-Complete agent YAML template with all sections (instructions, guidelines, tools, collaborators, knowledge bases).
+Complete native agent YAML template with all sections (instructions, guidelines, tools, collaborators, knowledge bases).
 
-**When to use**: Starting point for creating new agents.
+**When to use**: Starting point for creating new native agents.
+
+#### `templates/langgraph-agent-template.yaml`
+Complete LangGraph agent YAML template with framework-specific configuration (entrypoint, checkpointer).
+
+**When to use**: Starting point for creating new LangGraph agents.
+
+#### `templates/langgraph-agent-template.py`
+Comprehensive LangGraph agent Python template with StateGraph structure, node definitions, conditional routing examples, and external LLM integration patterns.
+
+**When to use**: Starting point for implementing LangGraph agent logic.
+
+#### `templates/langgraph-requirements.txt`
+LangGraph dependencies template with core requirements and optional provider packages.
+
+**When to use**: Setting up Python dependencies for LangGraph agents.
 
 #### `templates/tool-template.py`
 Python tool template with proper decorator, type hints, docstrings, and error handling.
