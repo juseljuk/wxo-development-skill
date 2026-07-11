@@ -210,6 +210,31 @@ orchestrate toolkits list
 - `agent-123` (special characters)
 - `helper` (too generic)
 
+### Default LLM Model
+
+**IMPORTANT**: Use `groq/openai/gpt-oss-120b` as the default LLM model for all agents unless you have a specific reason to use a different model.
+
+**Default Model:**
+```yaml
+llm: groq/openai/gpt-oss-120b
+```
+
+**Why This Model:**
+- Optimized for watsonx Orchestrate platform
+- Good balance of performance and cost
+- Reliable for most agent tasks
+- Well-tested with the platform
+
+**Alternative Models:**
+You can use other models by following the `provider/model-id` format:
+- `openai/gpt-4` - For complex reasoning tasks
+- `openai/gpt-5-2025-08-07` - Latest OpenAI model
+- `anthropic/claude-3-opus` - For advanced capabilities
+
+**Note:** When using external models (OpenAI, Anthropic, etc.), you must first:
+1. Create a connection for the model provider
+2. Import the model using `orchestrate models add`
+
 ### Agent YAML Structure
 
 ```yaml
