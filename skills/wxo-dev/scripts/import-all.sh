@@ -122,9 +122,26 @@ if [ -d "plugins" ] && [ "$(ls -A plugins/*.py 2>/dev/null)" ]; then
     echo ""
 fi
 
-# Import agents
+# Import LangGraph agents (must be imported before native agents that reference them)
+if [ -d "langgraph_agents" ]; then
+    print_step "🔀 Importing LangGraph agents..."
+    for dir in langgraph_agents/*/; do
+        if [ -d "$dir" ] && [ -f "${dir}agent.yaml" ]; then
+            agent_name=$(basename "$dir")
+            echo "  Importing LangGraph agent: $agent_name..."
+            if orchestrate agents import -k langgraph -f "$dir"; then
+                print_success "Imported LangGraph agent: $agent_name"
+            else
+                print_error "Failed to import LangGraph agent: $agent_name"
+            fi
+        fi
+    done
+    echo ""
+fi
+
+# Import native agents (after LangGraph agents, as they may reference them as collaborators)
 if [ -d "agents" ] && [ "$(ls -A agents/*.yaml 2>/dev/null)" ]; then
-    print_step "📦 Importing agents..."
+    print_step "📦 Importing native agents..."
     for file in agents/*.yaml; do
         if [ -f "$file" ]; then
             echo "  Importing $(basename "$file")..."

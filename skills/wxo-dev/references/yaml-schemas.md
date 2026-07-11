@@ -488,4 +488,306 @@ foreach = aflow.foreach(items="input.items", body=process_node)
 - Input/output schemas must be Pydantic models
 - Tool references must include toolkit prefix
 - All nodes must be connected to graph
+
+---
+
+## LangGraph Agent YAML Schema
+
+### Complete LangGraph Agent Structure
+
+```yaml
+spec_version: v1                # Required: Always "v1"
+kind: agent                     # Required: Always "agent" for LangGraph
+name: agent_name                # Required: snake_case, no spaces
+title: Agent Title              # Required: Human-readable title
+description: |                  # Required: Multi-line description
+  Clear description of agent purpose and capabilities.
+  What the agent does and when to use it.
+
+framework: langgraph            # Required: Always "langgraph"
+
+deployment:                     # Required: Deployment configuration
+  code_bundle:
+    entrypoint: module:function # Required: Factory function path
+
+checkpointer:                   # Optional: State persistence
+  type: memory                  # memory, sqlite, postgres
+  connection_string_key: conn   # Required for postgres
+```
+
+### Field Descriptions
+
+#### spec_version
+- **Type:** String
+- **Required:** Yes
+- **Value:** Always "v1"
+- **Description:** Schema version identifier
+
+#### kind
+- **Type:** String
+- **Required:** Yes
+- **Value:** Always "agent" for LangGraph agents
+- **Description:** Agent type identifier
+
+#### name
+- **Type:** String
+- **Required:** Yes
+- **Format:** snake_case, no spaces, no special characters
+- **Description:** Unique agent identifier
+- **Examples:** `research_agent`, `customer_support_agent`
+
+#### title
+- **Type:** String
+- **Required:** Yes
+- **Description:** Human-readable agent name for UI display
+- **Examples:** "Research Agent", "Customer Support Agent"
+
+#### description
+- **Type:** String (multi-line)
+- **Required:** Yes
+- **Description:** Clear description of agent purpose and capabilities
+
+#### framework
+- **Type:** String
+- **Required:** Yes
+- **Value:** Always "langgraph"
+- **Description:** Framework identifier
+
+#### deployment.code_bundle.entrypoint
+- **Type:** String
+- **Required:** Yes
+- **Format:** `module:function` or `module.submodule:function`
+- **Description:** Path to factory function that creates StateGraph
+- **Examples:**
+  - `agent:create_agent`
+  - `src.agent:build_graph`
+  - `core.graph:create_research_agent`
+
+#### checkpointer.type
+- **Type:** String
+- **Required:** No
+- **Values:** "memory", "sqlite", "postgres"
+- **Default:** "memory"
+- **Description:** State persistence mechanism
+- **Details:**
+  - **memory**: In-memory only, no persistence across restarts
+  - **sqlite**: File-based persistence, single-instance only
+  - **postgres**: Database persistence, supports multi-instance
+
+#### checkpointer.connection_string_key
+- **Type:** String
+- **Required:** Yes (when type is "postgres")
+- **Description:** Key name in connection for PostgreSQL connection string
+- **Example:** `postgres_connection`
+
+### LangGraph Agent Package Structure
+
+```
+agent-name/
+├── agent.yaml              # Required: Agent configuration
+├── agent.py                # Required: Factory function
+├── requirements.txt        # Required: Python dependencies
+└── core/                   # Optional: Additional modules
+    ├── __init__.py
+    ├── state.py
+    └── nodes.py
+```
+
+### Factory Function Requirements
+
+```python
+from langgraph.graph import StateGraph
+from typing import TypedDict
+
+class AgentState(TypedDict):
+    """State definition"""
+    field1: str
+    field2: int
+
+def create_agent() -> StateGraph:
+    """
+    Factory function that creates the agent.
+    
+    CRITICAL: Must return UNCOMPILED StateGraph.
+    The platform compiles the graph at runtime.
+    
+    Returns:
+        StateGraph: Uncompiled StateGraph instance
+    """
+    graph = StateGraph(AgentState)
+    
+    # Add nodes
+    graph.add_node("node1", node1_function)
+    graph.add_node("node2", node2_function)
+    
+    # Define flow
+    graph.set_entry_point("node1")
+    graph.add_edge("node1", "node2")
+    graph.add_edge("node2", END)
+    
+    return graph  # Return uncompiled - DO NOT call .compile()
+```
+
+### Checkpointer Examples
+
+#### Memory Checkpointer (Default)
+```yaml
+checkpointer:
+  type: memory
+```
+
+#### SQLite Checkpointer
+```yaml
+checkpointer:
+  type: sqlite
+```
+
+#### PostgreSQL Checkpointer
+```yaml
+checkpointer:
+  type: postgres
+  connection_string_key: postgres_connection
+```
+
+**PostgreSQL Connection Setup:**
+```bash
+# Create connection
+orchestrate connections add --app-id postgres --env draft
+orchestrate connections configure --app-id postgres --env draft --type team --kind key_value
+
+# Set connection string
+orchestrate connections set-credentials --app-id postgres --env draft \
+  --entries "postgres_connection=postgresql://user:pass@host:5432/dbname"
+```
+
+### Complete Example
+
+```yaml
+spec_version: v1
+kind: agent
+name: customer_support_agent
+title: Customer Support Agent
+description: |
+  Handles customer inquiries with context persistence.
+  Provides personalized support based on conversation history.
+
+framework: langgraph
+
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent
+
+checkpointer:
+  type: postgres
+  connection_string_key: postgres_connection
+```
+
+### Validation Rules
+
+#### LangGraph Agent Validation
+- Name must be snake_case
+- Title must be provided
+- Framework must be "langgraph"
+- Entrypoint must point to valid factory function
+- Factory function must return uncompiled StateGraph
+- LangGraph version must be >= 0.6.0
+- Checkpointer type must be valid
+- PostgreSQL connection must exist if using postgres checkpointer
+
+#### Platform Availability
+- **Supported:** Commercial AWS regions, IBM Cloud regions
+- **Not Supported:** On-premises deployments, GovCloud regions
+
+#### Import Requirements
+- Package must contain agent.yaml
+- Package must contain Python file with factory function
+- requirements.txt must include langgraph>=0.6.0
+- All dependencies must be installable from PyPI
+
+### Common Mistakes
+
+❌ **Wrong - Compiled StateGraph:**
+```python
+def create_agent() -> StateGraph:
+    graph = StateGraph(State)
+    # ... add nodes ...
+    return graph.compile()  # WRONG - Do not compile
+```
+
+✅ **Correct - Uncompiled StateGraph:**
+```python
+def create_agent() -> StateGraph:
+    graph = StateGraph(State)
+    # ... add nodes ...
+    return graph  # CORRECT - Return uncompiled
+```
+
+❌ **Wrong - Missing title:**
+```yaml
+spec_version: v1
+kind: agent
+name: my_agent
+framework: langgraph
+```
+
+✅ **Correct - With title:**
+```yaml
+spec_version: v1
+kind: agent
+name: my_agent
+title: My Agent
+framework: langgraph
+```
+
+❌ **Wrong - Invalid entrypoint format:**
+```yaml
+deployment:
+  code_bundle:
+    entrypoint: agent.create_agent  # Wrong separator
+```
+
+✅ **Correct - Colon separator:**
+```yaml
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent  # Correct
+```
+
+### Import Command
+
+```bash
+# Import LangGraph agent
+orchestrate agents import -k langgraph -f agent-directory/
+
+# Verify import
+orchestrate agents list | grep agent_name
+```
+
+### Using LangGraph Agents as Collaborators
+
+LangGraph agents can be used as collaborators in native agents:
+
+```yaml
+# Native agent YAML
+spec_version: v1
+kind: native
+name: orchestrator_agent
+llm: groq/openai/gpt-oss-120b
+
+collaborators:
+  - customer_support_agent  # LangGraph agent
+
+guidelines:
+  - condition: "User needs customer support"
+    action: "Hand off to customer_support_agent collaborator"
+```
+
+**Import Order:**
+```bash
+# 1. Import LangGraph agent first
+orchestrate agents import -k langgraph -f customer-support-agent/
+
+# 2. Import native agent that references it
+orchestrate agents import -f orchestrator-agent.yaml
+```
 - Graph must have START and END nodes

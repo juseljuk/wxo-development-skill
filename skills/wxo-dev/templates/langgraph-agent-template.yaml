@@ -1,0 +1,19 @@
+spec_version: v1
+kind: agent
+name: <agent_name>
+title: <Agent Title>
+description: |
+  <Clear description of what this agent does>
+  <Include capabilities and use cases>
+
+framework: langgraph
+
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent
+
+checkpointer:
+  type: memory  # Options: memory, sqlite, postgres
+  # connection_string_key: postgres_connection  # Required for postgres
+
+# Made with Bob

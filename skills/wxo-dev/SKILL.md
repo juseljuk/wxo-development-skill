@@ -493,6 +493,385 @@ orchestrate tools import -k flow -f tools/my_workflow.py
 
 # Verify import
 orchestrate tools list | grep my_workflow
+
+---
+
+## LangGraph Agent Integration
+
+**IMPORTANT**: LangGraph integration is only supported in commercial AWS and IBM Cloud regions. It is NOT available for on-premises deployments or AWS GovCloud (US).
+
+### What are LangGraph Agents?
+
+LangGraph agents are custom agents built using the LangGraph framework that can be imported into watsonx Orchestrate to run natively within the platform runtime. Unlike external agents, LangGraph agents are fully integrated into watsonx Orchestrate, benefiting from enterprise infrastructure, security, monitoring, and operational capabilities.
+
+**Key Benefits:**
+- **Full control** over agent logic and reasoning patterns
+- **Complex workflows** with cyclical graphs and conditional logic
+- **Custom state management** for multi-step orchestration
+- **Enterprise infrastructure** - hosting, security, authentication, monitoring
+- **Native integration** - runs within watsonx Orchestrate runtime
+- **A2A protocol** - can collaborate with other agents
+
+**Use Cases:**
+- Deploying existing LangGraph agents to production without rewriting
+- Building specialized agents with complex reasoning beyond simple ReAct loops
+- Custom state management for sophisticated workflows
+- Multi-stage orchestration with conditional branching
+
+### LangGraph Package Structure
+
+A LangGraph agent package must contain these files:
+
+**Minimum Required Files:**
+```
+my-langgraph-agent/
+├── agent.yaml          # Agent configuration and metadata
+├── agent.py           # Python module with factory function
+└── requirements.txt   # Python dependencies (must include langgraph>=0.6.0)
+```
+
+**Optional Files:**
+```
+my-langgraph-agent/
+├── agent.yaml
+├── agent.py
+├── requirements.txt
+├── core/              # Subdirectories for organization
+│   ├── __init__.py
+│   ├── state.py       # State definitions
+│   └── config.py      # Configuration
+├── tools/             # Custom tools
+│   ├── __init__.py
+│   └── api_tools.py
+└── utils/             # Utility functions
+    ├── __init__.py
+    └── logging.py
+```
+
+### agent.yaml Configuration
+
+**Required Fields:**
+```yaml
+spec_version: v1
+kind: agent
+name: my_langgraph_agent        # snake_case, unique identifier
+description: |
+  Clear description of what the agent does
+deployment:
+  code_bundle:
+    entrypoint: module:function  # e.g., agent:create_agent
+```
+
+**Optional Fields:**
+```yaml
+title: My LangGraph Agent       # Display name in UI
+framework: langgraph            # Defaults to langgraph
+checkpointer:                   # For state persistence
+  type: postgres                # postgres, sqlite, or memory
+  connection_string_key: db_connection_string
+```
+
+**Full Example:**
+```yaml
+spec_version: v1
+kind: agent
+name: customer_research_agent
+title: Customer Research Agent
+description: |
+  Researches customer information using multiple data sources
+  and compiles comprehensive reports with citations.
+framework: langgraph
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent
+checkpointer:
+  type: postgres
+  connection_string_key: postgres_connection
+```
+
+### Factory Function Implementation
+
+**CRITICAL**: The factory function must return an **uncompiled** `StateGraph`. watsonx Orchestrate compiles and manages the graph.
+
+**Basic Structure:**
+```python
+# agent.py
+from langgraph.graph import StateGraph, END
+from typing import TypedDict
+
+class AgentState(TypedDict):
+    """Define your state schema"""
+    messages: list
+    current_step: str
+    result: dict
+
+def create_agent() -> StateGraph:
+    """
+    Factory function that creates the LangGraph agent.
+    
+    Returns:
+        StateGraph: An UNCOMPILED StateGraph instance
+    """
+    # Create graph
+    graph = StateGraph(AgentState)
+    
+    # Add nodes
+    graph.add_node("research", research_node)
+    graph.add_node("analyze", analyze_node)
+    graph.add_node("compile", compile_node)
+    
+    # Add edges
+    graph.set_entry_point("research")
+    graph.add_edge("research", "analyze")
+    graph.add_edge("analyze", "compile")
+    graph.add_edge("compile", END)
+    
+    # Return UNCOMPILED graph
+    return graph  # DO NOT call .compile()
+
+def research_node(state: AgentState) -> AgentState:
+    """Node implementation"""
+    # Your logic here
+    return state
+
+def analyze_node(state: AgentState) -> AgentState:
+    """Node implementation"""
+    # Your logic here
+    return state
+
+def compile_node(state: AgentState) -> AgentState:
+    """Node implementation"""
+    # Your logic here
+    return state
+```
+
+### Connection Requirements
+
+**IMPORTANT**: Create all required connections BEFORE importing the agent.
+
+If your LangGraph agent calls external LLMs or tools that require authentication:
+
+1. **Create connections first:**
+```bash
+orchestrate connections add --app-id openai --env draft
+orchestrate connections configure --app-id openai --env draft --type team --kind key_value
+orchestrate connections set-credentials --app-id openai --env draft --entries "api_key=$OPENAI_API_KEY"
+```
+
+2. **Reference in agent code:**
+```python
+from ibm_watsonx_orchestrate import get_connection
+
+def create_agent() -> StateGraph:
+    # Get connection credentials
+    openai_key = get_connection("openai")["api_key"]
+    
+    # Use in your agent logic
+    llm = ChatOpenAI(api_key=openai_key)
+    # ...
+```
+
+### State Persistence (Checkpointers)
+
+Enable conversation state persistence across interactions:
+
+**Three Types:**
+
+1. **PostgreSQL** (Production)
+   - Persistent storage
+   - Requires connection
+   - Best for production
+
+2. **SQLite** (Development)
+   - File-based persistence
+   - Good for testing
+   - Not recommended for production
+
+3. **Memory** (No Persistence)
+   - State resets between interactions
+   - Fastest, but no history
+
+**Configuration:**
+```yaml
+checkpointer:
+  type: postgres  # or sqlite, memory
+  connection_string_key: db_connection_string
+```
+
+**Creating PostgreSQL Connection:**
+```bash
+orchestrate connections add --app-id postgres --env draft
+orchestrate connections configure --app-id postgres --env draft --type team --kind key_value
+orchestrate connections set-credentials --app-id postgres --env draft \
+  --entries "db_connection_string=postgresql://user:pass@host:5432/dbname"
+```
+
+### Importing LangGraph Agents
+
+**From Directory:**
+```bash
+# Import from package directory
+orchestrate agents import -k langgraph -f /path/to/my-langgraph-agent/
+
+# Verify import
+orchestrate agents list | grep my_langgraph_agent
+```
+
+**From ZIP File:**
+```bash
+# Create ZIP (must include agent.yaml, agent.py, requirements.txt)
+cd my-langgraph-agent
+zip -r ../my-langgraph-agent.zip .
+
+# Import ZIP
+orchestrate agents import -k langgraph -f ../my-langgraph-agent.zip
+```
+
+**Import Process:**
+1. Create required connections
+2. Package agent (directory or ZIP)
+3. Import using `-k langgraph` flag
+4. Platform installs dependencies from requirements.txt
+5. Platform compiles and deploys the graph
+
+### Using LangGraph Agents
+
+**As Standalone Agent:**
+- Available in chat UI
+- Can be deployed to channels
+- Full agent capabilities
+
+**As Collaborator:**
+```yaml
+# native-agent.yaml
+spec_version: v1
+kind: native
+name: orchestrator_agent
+llm: groq/openai/gpt-oss-120b
+
+collaborators:
+  - my_langgraph_agent  # Reference LangGraph agent
+
+guidelines:
+  - condition: "User needs detailed research"
+    action: "Hand off to my_langgraph_agent collaborator"
+```
+
+### Requirements.txt
+
+**Minimum Requirements:**
+```txt
+langgraph>=0.6.0
+langchain-core>=0.1.0
+```
+
+**With External LLMs:**
+```txt
+langgraph>=0.6.0
+langchain-core>=0.1.0
+langchain-openai>=0.0.5
+langchain-anthropic>=0.1.0
+```
+
+**With Additional Tools:**
+```txt
+langgraph>=0.6.0
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+```
+
+### Best Practices
+
+1. **Version Requirements**
+   - Use LangGraph ^0.6.0 or higher (required for async streaming)
+   - Keep dependencies up to date
+
+2. **Factory Function**
+   - Always return uncompiled StateGraph
+   - Let watsonx Orchestrate handle compilation
+   - Don't call `.compile()` in your code
+
+3. **Connections**
+   - Create all connections before import
+   - Use key_value connections for API keys
+   - Reference connections in code, not hardcode credentials
+
+4. **State Persistence**
+   - Use PostgreSQL for production
+   - SQLite for development/testing
+   - Memory for stateless agents
+
+5. **Testing**
+   - Test locally before importing
+   - Use LangGraph Studio for development
+   - Verify all connections work
+
+6. **Naming**
+   - Follow snake_case convention
+   - Use descriptive names
+   - Avoid generic names like "agent" or "helper"
+
+### Limitations & Considerations
+
+**Platform Availability:**
+- ✅ Commercial AWS regions
+- ✅ IBM Cloud regions
+- ❌ On-premises deployments
+- ❌ AWS GovCloud (US)
+
+**Technical Requirements:**
+- LangGraph version must be ^0.6.0 or higher
+- Must support native async streaming
+- Factory function must return uncompiled StateGraph
+
+**State Management:**
+- Checkpointer configuration required for persistence
+- Memory checkpointer doesn't persist across sessions
+- PostgreSQL recommended for production
+
+### Troubleshooting
+
+**Import Fails:**
+```bash
+# Check agent.yaml syntax
+cat agent.yaml
+
+# Verify entrypoint exists
+python -c "from agent import create_agent; print(create_agent)"
+
+# Check LangGraph version
+pip show langgraph
+```
+
+**Connection Errors:**
+```bash
+# Verify connections exist
+orchestrate connections list
+
+# Test connection
+orchestrate connections get -a openai
+```
+
+**State Persistence Issues:**
+```bash
+# Verify checkpointer connection
+orchestrate connections get -a postgres
+
+# Check connection string format
+# Should be: postgresql://user:pass@host:5432/dbname
+```
+
+**Version Compatibility:**
+```bash
+# Ensure LangGraph >= 0.6.0
+pip install --upgrade langgraph
+
+# Update requirements.txt
+echo "langgraph>=0.6.0" > requirements.txt
+```
+
 ```
 
 **Testing Workflows:**

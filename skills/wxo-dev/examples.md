@@ -7,13 +7,14 @@ Complete, working reference implementations demonstrating best practices.
 1. [Complete Agent Examples](#complete-agent-examples)
 2. [Tool Examples](#tool-examples)
 3. [Workflow Examples](#workflow-examples)
-4. [Knowledge Base Examples](#knowledge-base-examples)
-5. [MCP Integration Examples](#mcp-integration-examples)
-6. [Multi-Agent Collaboration Examples](#multi-agent-collaboration-examples)
-7. [Guardrail Examples](#guardrail-examples)
-8. [Testing Examples](#testing-examples)
-9. [Connection Examples](#connection-examples)
-10. [Deployment Examples](#deployment-examples)
+4. [LangGraph Agent Examples](#langgraph-agent-examples)
+5. [Knowledge Base Examples](#knowledge-base-examples)
+6. [MCP Integration Examples](#mcp-integration-examples)
+7. [Multi-Agent Collaboration Examples](#multi-agent-collaboration-examples)
+8. [Guardrail Examples](#guardrail-examples)
+9. [Testing Examples](#testing-examples)
+10. [Connection Examples](#connection-examples)
+11. [Deployment Examples](#deployment-examples)
 
 ---
 
@@ -260,6 +261,449 @@ def build_loan_approval_workflow(aflow: Flow) -> Flow:
     aflow.edge(reject_loan, END)
     
     return aflow
+```
+
+
+## LangGraph Agent Examples
+
+### Example 1: Simple Research Agent
+
+**Directory Structure:**
+```
+research-agent/
+├── agent.yaml
+├── agent.py
+└── requirements.txt
+```
+
+**agent.yaml:**
+```yaml
+spec_version: v1
+kind: agent
+name: research_agent
+title: Research Agent
+description: |
+  Conducts research on topics using web search and compiles findings
+framework: langgraph
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent
+checkpointer:
+  type: memory
+```
+
+**agent.py:**
+```python
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, List
+from langchain_core.messages import HumanMessage, AIMessage
+
+class ResearchState(TypedDict):
+    """State for research agent"""
+    query: str
+    search_results: List[str]
+    analysis: str
+    final_report: str
+
+def create_agent() -> StateGraph:
+    """
+    Factory function that creates the research agent.
+    
+    Returns:
+        StateGraph: Uncompiled StateGraph instance
+    """
+    graph = StateGraph(ResearchState)
+    
+    # Add nodes
+    graph.add_node("search", search_node)
+    graph.add_node("analyze", analyze_node)
+    graph.add_node("compile_report", compile_report_node)
+    
+    # Define flow
+    graph.set_entry_point("search")
+    graph.add_edge("search", "analyze")
+    graph.add_edge("analyze", "compile_report")
+    graph.add_edge("compile_report", END)
+    
+    return graph  # Return uncompiled
+
+def search_node(state: ResearchState) -> ResearchState:
+    """Simulate web search"""
+    query = state["query"]
+    # In real implementation, call search API
+    state["search_results"] = [
+        f"Result 1 for {query}",
+        f"Result 2 for {query}",
+        f"Result 3 for {query}"
+    ]
+    return state
+
+def analyze_node(state: ResearchState) -> ResearchState:
+    """Analyze search results"""
+    results = state["search_results"]
+    # In real implementation, use LLM to analyze
+    state["analysis"] = f"Analysis of {len(results)} results"
+    return state
+
+def compile_report_node(state: ResearchState) -> ResearchState:
+    """Compile final report"""
+    state["final_report"] = f"Research Report:\n{state['analysis']}"
+    return state
+```
+
+**requirements.txt:**
+```txt
+langgraph>=0.6.0
+langchain-core>=0.1.0
+```
+
+**Import:**
+```bash
+orchestrate agents import -k langgraph -f research-agent/
+```
+
+---
+
+### Example 2: Customer Support Agent with State Persistence
+
+**Directory Structure:**
+```
+customer-support-agent/
+├── agent.yaml
+├── agent.py
+├── requirements.txt
+└── core/
+    ├── __init__.py
+    ├── state.py
+    └── nodes.py
+```
+
+**agent.yaml:**
+```yaml
+spec_version: v1
+kind: agent
+name: customer_support_agent
+title: Customer Support Agent
+description: |
+  Handles customer inquiries with context persistence across conversations
+framework: langgraph
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent
+checkpointer:
+  type: postgres
+  connection_string_key: postgres_connection
+```
+
+**core/state.py:**
+```python
+from typing import TypedDict, List, Optional
+
+class SupportState(TypedDict):
+    """State for customer support agent"""
+    customer_id: Optional[str]
+    conversation_history: List[dict]
+    current_issue: str
+    issue_category: str
+    resolution_status: str
+    escalation_needed: bool
+```
+
+**core/nodes.py:**
+```python
+from .state import SupportState
+
+def classify_issue(state: SupportState) -> SupportState:
+    """Classify the customer issue"""
+    issue = state["current_issue"]
+    # Use LLM to classify
+    state["issue_category"] = "billing"  # Example
+    return state
+
+def check_escalation(state: SupportState) -> SupportState:
+    """Determine if escalation is needed"""
+    category = state["issue_category"]
+    # Logic to determine escalation
+    state["escalation_needed"] = category in ["legal", "executive"]
+    return state
+
+def resolve_issue(state: SupportState) -> SupportState:
+    """Attempt to resolve the issue"""
+    state["resolution_status"] = "resolved"
+    return state
+
+def escalate_issue(state: SupportState) -> SupportState:
+    """Escalate to human agent"""
+    state["resolution_status"] = "escalated"
+    return state
+```
+
+**agent.py:**
+```python
+from langgraph.graph import StateGraph, END
+from core.state import SupportState
+from core.nodes import (
+    classify_issue,
+    check_escalation,
+    resolve_issue,
+    escalate_issue
+)
+
+def create_agent() -> StateGraph:
+    """
+    Factory function for customer support agent.
+    
+    Returns:
+        StateGraph: Uncompiled StateGraph with conditional routing
+    """
+    graph = StateGraph(SupportState)
+    
+    # Add nodes
+    graph.add_node("classify", classify_issue)
+    graph.add_node("check_escalation", check_escalation)
+    graph.add_node("resolve", resolve_issue)
+    graph.add_node("escalate", escalate_issue)
+    
+    # Define flow
+    graph.set_entry_point("classify")
+    graph.add_edge("classify", "check_escalation")
+    
+    # Conditional routing based on escalation
+    graph.add_conditional_edges(
+        "check_escalation",
+        lambda state: "escalate" if state["escalation_needed"] else "resolve",
+        {
+            "escalate": "escalate",
+            "resolve": "resolve"
+        }
+    )
+    
+    graph.add_edge("resolve", END)
+    graph.add_edge("escalate", END)
+    
+    return graph
+```
+
+**requirements.txt:**
+```txt
+langgraph>=0.6.0
+langchain-core>=0.1.0
+psycopg2-binary>=2.9.0
+```
+
+**Setup:**
+```bash
+# Create PostgreSQL connection
+orchestrate connections add --app-id postgres --env draft
+orchestrate connections configure --app-id postgres --env draft --type team --kind key_value
+orchestrate connections set-credentials --app-id postgres --env draft \
+  --entries "postgres_connection=postgresql://user:pass@host:5432/dbname"
+
+# Import agent
+orchestrate agents import -k langgraph -f customer-support-agent/
+```
+
+---
+
+### Example 3: Multi-Tool Research Agent with External LLM
+
+**Directory Structure:**
+```
+advanced-research-agent/
+├── agent.yaml
+├── agent.py
+├── requirements.txt
+└── tools/
+    ├── __init__.py
+    ├── web_search.py
+    └── data_analysis.py
+```
+
+**agent.yaml:**
+```yaml
+spec_version: v1
+kind: agent
+name: advanced_research_agent
+title: Advanced Research Agent
+description: |
+  Comprehensive research agent using multiple tools and external LLM
+framework: langgraph
+deployment:
+  code_bundle:
+    entrypoint: agent:create_agent
+checkpointer:
+  type: sqlite
+```
+
+**tools/web_search.py:**
+```python
+from ibm_watsonx_orchestrate import get_connection
+
+def search_web(query: str) -> list:
+    """Search the web using external API"""
+    # Get API credentials from connection
+    api_key = get_connection("search_api")["api_key"]
+    
+    # Perform search (simplified)
+    results = [
+        {"title": f"Result for {query}", "url": "https://example.com"}
+    ]
+    return results
+```
+
+**tools/data_analysis.py:**
+```python
+def analyze_data(data: list) -> dict:
+    """Analyze research data"""
+    return {
+        "summary": f"Analyzed {len(data)} items",
+        "key_findings": ["Finding 1", "Finding 2"]
+    }
+```
+
+**agent.py:**
+```python
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, List
+from langchain_openai import ChatOpenAI
+from ibm_watsonx_orchestrate import get_connection
+from tools.web_search import search_web
+from tools.data_analysis import analyze_data
+
+class ResearchState(TypedDict):
+    query: str
+    search_results: List[dict]
+    analysis: dict
+    report: str
+
+def create_agent() -> StateGraph:
+    """
+    Advanced research agent with external LLM.
+    
+    Returns:
+        StateGraph: Uncompiled graph
+    """
+    # Get OpenAI credentials
+    openai_key = get_connection("openai")["api_key"]
+    llm = ChatOpenAI(api_key=openai_key, model="gpt-4")
+    
+    graph = StateGraph(ResearchState)
+    
+    # Add nodes with LLM access
+    graph.add_node("search", lambda state: search_node(state, llm))
+    graph.add_node("analyze", lambda state: analyze_node(state, llm))
+    graph.add_node("generate_report", lambda state: report_node(state, llm))
+    
+    # Define flow
+    graph.set_entry_point("search")
+    graph.add_edge("search", "analyze")
+    graph.add_edge("analyze", "generate_report")
+    graph.add_edge("generate_report", END)
+    
+    return graph
+
+def search_node(state: ResearchState, llm) -> ResearchState:
+    """Search with query refinement"""
+    query = state["query"]
+    
+    # Use LLM to refine query
+    refined_query = llm.invoke(f"Refine this search query: {query}")
+    
+    # Perform search
+    state["search_results"] = search_web(refined_query.content)
+    return state
+
+def analyze_node(state: ResearchState, llm) -> ResearchState:
+    """Analyze results using LLM"""
+    results = state["search_results"]
+    
+    # Analyze with tools
+    analysis = analyze_data(results)
+    
+    # Enhance with LLM
+    enhanced = llm.invoke(f"Enhance this analysis: {analysis}")
+    state["analysis"] = {"enhanced": enhanced.content, **analysis}
+    return state
+
+def report_node(state: ResearchState, llm) -> ResearchState:
+    """Generate final report"""
+    analysis = state["analysis"]
+    
+    # Generate report with LLM
+    report = llm.invoke(f"Create a report from: {analysis}")
+    state["report"] = report.content
+    return state
+```
+
+**requirements.txt:**
+```txt
+langgraph>=0.6.0
+langchain-core>=0.1.0
+langchain-openai>=0.0.5
+requests>=2.31.0
+```
+
+**Setup:**
+```bash
+# Create OpenAI connection
+orchestrate connections add --app-id openai --env draft
+orchestrate connections configure --app-id openai --env draft --type team --kind key_value
+orchestrate connections set-credentials --app-id openai --env draft \
+  --entries "api_key=$OPENAI_API_KEY"
+
+# Create search API connection
+orchestrate connections add --app-id search_api --env draft
+orchestrate connections configure --app-id search_api --env draft --type team --kind key_value
+orchestrate connections set-credentials --app-id search_api --env draft \
+  --entries "api_key=$SEARCH_API_KEY"
+
+# Import agent
+orchestrate agents import -k langgraph -f advanced-research-agent/
+```
+
+---
+
+### Example 4: Using LangGraph Agent as Collaborator
+
+**Native Orchestrator Agent:**
+```yaml
+# agents/orchestrator-agent.yaml
+spec_version: v1
+kind: native
+name: main_orchestrator
+llm: groq/openai/gpt-oss-120b
+
+description: Main orchestrator that delegates to specialized agents
+
+instructions: |
+  You coordinate between different specialized agents.
+  Delegate research tasks to the research agent.
+
+collaborators:
+  - advanced_research_agent  # LangGraph agent
+
+guidelines:
+  - condition: "User requests detailed research"
+    action: "Hand off to advanced_research_agent collaborator for comprehensive research"
+  
+  - condition: "User needs customer support"
+    action: "Hand off to customer_support_agent collaborator"
+
+tools:
+  - check_order_status
+```
+
+**Import Order:**
+```bash
+# 1. Import LangGraph agents first (collaborators)
+orchestrate agents import -k langgraph -f advanced-research-agent/
+orchestrate agents import -k langgraph -f customer-support-agent/
+
+# 2. Import orchestrator agent that references them
+orchestrate agents import -f agents/orchestrator-agent.yaml
+
+# 3. Verify
+orchestrate agents list
 ```
 
 ---
